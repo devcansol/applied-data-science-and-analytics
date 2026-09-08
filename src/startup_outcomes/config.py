@@ -13,11 +13,21 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DATA_RAW = PROJECT_ROOT / "data" / "raw"
 RAW_CSV = DATA_RAW / "global_tech_startups_2026.csv"
 
+#: Declared destinations for derived data. Nothing in this project writes to them — every
+#: number is recomputed from ``data/raw`` in seconds — but the storage rule promises these
+#: directories by name, and a promise with no constant behind it is a comment.
+DATA_INTERIM = PROJECT_ROOT / "data" / "interim"
+DATA_PROCESSED = PROJECT_ROOT / "data" / "processed"
+
 #: sha256 of the Kaggle download this project was built against.
 RAW_CSV_SHA256 = "c843a3c03495b75c35713126cc3df8f902f8188abdfa876fff5bc4a9f0227ee2"
 
 #: Single seed for every split, shuffle, and model in the project.
 RANDOM_SEED = 20260908
+
+#: Resamples behind every reported interval. At 1,000 the second decimal of a percentage
+#: point is stable across draws while the diagnostic tier still runs in a few seconds.
+BOOTSTRAP_RESAMPLES = 1000
 
 ID_COLUMN = "Company_ID"
 TARGET = "Acquisition_Status"
@@ -63,6 +73,16 @@ EXCLUDED_LEAKY = [
 LEAKY_STAGE = "IPO"
 
 ALL_COLUMNS = [ID_COLUMN, *STRUCTURAL, *PRE_OUTCOME, *UNDATED, *EXCLUDED_LEAKY, TARGET]
+
+#: The size proxies, which are near-identical on logs (r = 0.93–0.97). Individual
+#: coefficients and individual importances across them are not interpretable, so they are
+#: read as one block; see the collinearity decision in ``.claude/rules/arch-modeling.md``.
+SIZE_BLOCK = [
+    "Total_Funding_USD_Millions",
+    "Valuation_USD_Millions",
+    "Revenue_ARR_Millions",
+    "Monthly_Burn_Rate_Millions",
+]
 
 
 def model_features(*, include_undated: bool = True) -> list[str]:

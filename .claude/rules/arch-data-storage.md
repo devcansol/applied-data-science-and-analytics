@@ -130,3 +130,101 @@ def test_ai_adoption_level_is_the_only_column_with_nulls(df):
 - ❌ Runtime assertions in `load_raw`: would make every load pay for the checks
 
 **Date:** 2026-09-08 | **Status:** ✅ Approved
+
+## Derived Artifacts
+
+#### ✅ Design Decision: Nothing is persisted
+
+**Context:**
+The reference workbooks chain their days through files — `day2_clean.csv`, `day3_model.joblib`,
+`final_model.joblib`, `model_card.txt`, saved figures — because a Colab session dies between days.
+This project runs in one process, and the full pipeline recomputes from `data/raw` in about 45
+seconds.
+
+**Pattern:**
+
+```python
+# ✅ GOOD — the handoff is a function call
+estimator = supervised.chosen_estimator()
+print(card.model_card())        # returned string, printed; never written
+
+# ❌ BAD
+joblib.dump(model, "final_model.joblib")
+open("model_card.txt", "w").write(card)
+```
+
+`DATA_INTERIM` and `DATA_PROCESSED` exist in `config.py` as declared destinations, because the rule
+above promises those directories by name and a promise with no constant behind it is a comment.
+Nothing writes to them. Enforced by `tests/test_repo_invariants.py::test_nothing_in_src_writes_to_disk`,
+which greps `src/` for `to_csv|to_parquet|to_pickle|joblib|savefig|.write(`.
+
+**Rationale:**
+1. A persisted model is a second source of truth that drifts from the code that made it, and this
+   project's whole discipline is "the number comes from a function and a test"
+2. `data/` is git-ignored, so an artifact there is invisible to review — the same back-door concern
+   that keeps notebook outputs out of version control
+3. A joblib pickle is version-brittle across scikit-learn upgrades, and unlike the CSV there is no
+   checksum contract to catch a silent behaviour change
+4. The model card is the better artifact: a rendering of a flat dict, every value pinned by a test,
+   diffable and unable to go stale
+
+**When NOT to Change This:**
+- Do not persist a model "so the notebook starts faster" — it starts fast enough
+- Do not write figures to disk
+
+**When to Revisit:**
+- A fit exceeding roughly five minutes. The cache would then go to `DATA_INTERIM` keyed by
+  `(RAW_CSV_SHA256, RANDOM_SEED, feature-list hash, estimator repr)` so a stale cache is
+  structurally impossible
+
+**Alternatives Considered:**
+- ❌ Persist the fitted model: version-brittle, invisible to review, and saves one second
+- ❌ Cache out-of-fold scores to Parquet: unnecessary today; the same effect is achieved by
+  threading the score vector through `run_all` as an argument
+
+**Date:** 2026-09-08 | **Status:** ✅ Approved
+
+#### ✅ Design Decision: A documented number that could not be reproduced, and how it was handled
+
+**Context:**
+The README stated that `AI_Adoption_Level` blanks were "near-uniform across strata (9.45%–14.71% by
+domain and funding stage), consistent with missing-completely-at-random". Neither half held. The
+true ranges on the reference download are 6.33%–14.71% across `Domain` and 8.44%–11.31% across
+`Funding_Stage`; the 9.45% floor matches no grouping that could be constructed. And the inference
+is contradicted: a permutation test puts the observed 8.38 pp domain spread beyond the null's 95th
+percentile of 6.43 pp, p = 0.007.
+
+It survived because it was one of the few claims in the README with no function behind it.
+
+**Pattern:**
+
+```python
+# The claim now has a function and a test, on both halves.
+descriptive.missingness_by_strata(df, "Domain")      # the range
+diagnostic.missingness_permutation(df, "Domain")     # whether the range beats chance
+```
+
+The README sentence, the two functions, and the two tests were changed in one commit, together with
+the imputation decision that depended on it (`arch-modeling.md`: missing is its own level, because
+mode-filling is not defensible once MCAR is ruled out).
+
+**Rationale:**
+1. This is exactly the failure the "every number has a function and a test" rule exists to prevent,
+   so the incident belongs in the rules as evidence the rule pays for itself
+2. `process-design-decisions.md` already mandates documenting any newly discovered data-integrity
+   defect and how it was handled
+3. The correction cascaded: it changed an imputation decision, which is what makes an unbacked
+   number dangerous rather than merely untidy
+
+**When NOT to Change This:**
+- Never add a figure to the README without a function and a test behind it, however obvious it seems
+- Never soften a claim to match a number; recompute the number
+
+**When to Revisit:**
+- Never. This is a recorded incident, not a policy that expires
+
+**Alternatives Considered:**
+- ❌ Quietly fix the range: loses the lesson, and the MCAR inference would have survived
+- ❌ Delete the sentence: the question it answers is load-bearing for the imputation choice
+
+**Date:** 2026-09-08 | **Status:** ✅ Approved

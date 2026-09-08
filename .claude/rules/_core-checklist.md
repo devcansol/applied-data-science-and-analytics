@@ -27,9 +27,26 @@ After completing ANY task with code changes:
   (verify: `uv run pytest tests/test_data_contract.py -k leaky`)
 - **`data/raw/` is immutable.** Nothing in the repo writes to it, and it is never committed
   (verify: `git check-ignore data/raw/global_tech_startups_2026.csv`)
-- **Every number quoted in the README comes from `audit.py` and is pinned by a test** — if a
-  documented finding changes, a test fails rather than the README going stale
-  (verify: `uv run pytest tests/test_audit.py`)
+- **Every number quoted in the README comes from a tier module and is pinned in that module's test
+  file** — `audit`, `descriptive`, `diagnostic`, `models/*`. If a documented finding changes, a test
+  fails rather than the README going stale
+  (verify: `uv run pytest`)
+- **Model metrics are quoted and pinned at 3 dp on pooled out-of-fold predictions**, and every
+  model-vs-model claim carries a structural assertion beside the pin, so a library upgrade moving a
+  digit is distinguishable from a changed finding
+  (verify: `uv run pytest tests/test_supervised.py`)
+- **Exactly one function may see an excluded column** — the labelled leakage demonstration, which
+  builds its feature set from `config.EXCLUDED_LEAKY` and never spells a column name
+  (verify: `uv run pytest -k leakage`)
+- **Nothing in `src/` writes to disk.** No model, table or figure is persisted; the pipeline
+  recomputes in ~45s
+  (verify: `grep -rn "to_csv\|to_parquet\|joblib\|savefig" src/ --include='*.py'` — expect no output)
+- **Plots compute no statistics and never import pyplot**
+  (verify: `grep -rnE "^\s*(import|from).*pyplot" src/ --include='*.py'` — expect no output; the
+  bare word appears in `plots.py`'s docstring explaining the rule, so the grep must be anchored to
+  import statements. `uv run pytest tests/test_plots.py` checks both halves)
+- **Nothing imports from `references/`**, which is excluded from the lint gate
+  (verify: `uv run pytest tests/test_repo_invariants.py`)
 - **Loading declares dtypes and `keep_default_na=False`** — pandas otherwise reads the valid
   `AI_Adoption_Level` value `"None"` as missing
   (verify: `uv run pytest tests/test_data_contract.py -k none_is_a_category`)

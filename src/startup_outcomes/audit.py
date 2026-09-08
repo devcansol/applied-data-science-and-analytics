@@ -27,6 +27,17 @@ RUNWAY_CLIFF_MONTHS = 6.0
 CLOSED = "Closed"
 INDEPENDENT = "Independent"
 
+#: The size-proxy pairs whose log correlation is reported. Kept as a constant because the
+#: diagnostic tier compares Pearson against Spearman over the same pairs, and two
+#: hand-maintained lists would drift.
+SIZE_PAIRS = [
+    ("Total_Funding_USD_Millions", "Valuation_USD_Millions"),
+    ("Total_Funding_USD_Millions", "Revenue_ARR_Millions"),
+    ("Revenue_ARR_Millions", "Valuation_USD_Millions"),
+    ("Monthly_Burn_Rate_Millions", "Revenue_ARR_Millions"),
+    ("Peak_Headcount_2023", "Current_Headcount_2026"),
+]
+
 
 def shape(df: pd.DataFrame) -> dict[str, int]:
     """Row and column counts."""
@@ -127,7 +138,12 @@ def closed_company_coherence(df: pd.DataFrame) -> dict[str, float | int]:
     }
 
 
-def _closed_rate_by(df: pd.DataFrame, column: str) -> pd.Series:
+def closed_rate_by(df: pd.DataFrame, column: str) -> pd.Series:
+    """Closed rate, as a percentage, within each level of a categorical column.
+
+    Public because the descriptive and diagnostic tiers report the same quantity and must
+    not recompute it — a second implementation is a second answer waiting to happen.
+    """
     return df.groupby(column, observed=True)[TARGET].apply(lambda s: (s == CLOSED).mean() * 100)
 
 
@@ -137,7 +153,7 @@ def closed_rate_spread(df: pd.DataFrame, column: str) -> dict[str, float | str]:
     A spread no wider than sampling noise means the column carries no real signal
     about failure, whatever a model's feature importances may suggest.
     """
-    rates = _closed_rate_by(df, column).sort_values()
+    rates = closed_rate_by(df, column).sort_values()
     return {
         "column": column,
         "levels": int(len(rates)),
@@ -152,7 +168,7 @@ def closed_rate_spread(df: pd.DataFrame, column: str) -> dict[str, float | str]:
 def ai_adoption_effect(df: pd.DataFrame) -> dict[str, float]:
     """Closed rate at each AI-adoption level, ordered from no adoption to AI-native."""
     order = ["None", "Exploratory", "Moderate", "Advanced", "AI-Native"]
-    rates = _closed_rate_by(df, "AI_Adoption_Level")
+    rates = closed_rate_by(df, "AI_Adoption_Level")
     present = [level for level in order if level in rates.index]
     result = {level: round(float(rates[level]), 2) for level in present}
     result["spread_pp"] = round(max(result.values()) - min(result.values()), 2)
@@ -176,13 +192,7 @@ def log_correlations(df: pd.DataFrame) -> dict[str, float]:
     These are all size proxies, so high correlation is expected; the point is how
     high, because it decides whether the features can be interpreted separately.
     """
-    pairs = [
-        ("Total_Funding_USD_Millions", "Valuation_USD_Millions"),
-        ("Total_Funding_USD_Millions", "Revenue_ARR_Millions"),
-        ("Revenue_ARR_Millions", "Valuation_USD_Millions"),
-        ("Monthly_Burn_Rate_Millions", "Revenue_ARR_Millions"),
-        ("Peak_Headcount_2023", "Current_Headcount_2026"),
-    ]
+    pairs = SIZE_PAIRS
     logged = {
         column: np.log1p(df[column].to_numpy(dtype=float))
         for column in {column for pair in pairs for column in pair}

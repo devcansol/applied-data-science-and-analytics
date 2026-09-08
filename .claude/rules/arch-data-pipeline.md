@@ -137,3 +137,66 @@ row-wise iteration over a DataFrame.
 - ❌ Python loops over `zip` of columns: faster than `iterrows` but still loses vectorization
 
 **Date:** 2026-09-08 | **Status:** ✅ Approved
+
+## Uncertainty
+
+#### ✅ Design Decision: Bootstrap for a named comparison, permutation for a spread
+
+**Context:**
+`arch-modeling.md` requires an interval on every reported effect; the reference workbooks report
+none, substituting effect size in SD units plus an `n`. That cannot settle the question this dataset
+keeps posing — a 4.74 pp closed-rate spread across 20 domains is *either* a weak real effect *or*
+exactly what shuffling produces, and those call for opposite conclusions.
+
+The choice of instrument is not stylistic. Max-minus-min over twenty noisy estimates is positive
+even when every true rate is identical, so an interval around a spread answers the wrong question.
+
+**Pattern:**
+
+```python
+# ✅ A pre-specified pair -> bootstrap interval. Both sides named in advance, so unbiased.
+intervals.rate_gap_interval(groups, flags, high="None", low="AI-Native", name="...")
+
+# ✅ A spread across all levels -> permutation null. Shuffle at the observed group sizes.
+intervals.permutation_spread(df["Domain"], closed_flags, name="...")
+
+# ✅ Two models on one draw -> paired, which is what makes the difference interval narrow.
+intervals.paired_metric_difference(y, model_scores, baseline_scores, metric=..., name="...")
+
+# ❌ An interval around max-minus-min: always positive, answers the wrong question.
+```
+
+Conventions: `BOOTSTRAP_RESAMPLES = 1_000` in `config.py`; percentile method at 2.5/97.5; the
+generator is built **inside** the function on one physical line naming `RANDOM_SEED`, never at
+module level; statistics are vectorised with `np.bincount` rather than a groupby inside the loop;
+the index is drawn per iteration, never pre-allocated as a matrix.
+
+Returned dicts carry unit-suffixed keys — `point_pp`, `ci_low_pp`, `ci_high_pp`, `ci_width_pp`,
+`resamples`, `excludes_zero` — and every interval gets **two** assertions in tests: the pinned
+endpoints, and separately the claim (`excludes_zero is True`).
+
+**Rationale:**
+1. A module-level generator would make every interval depend on how many ran before it — the same
+   call-order defect the pure-transform rule exists to prevent — and would hide from the seed grep
+2. Sharing one draw across a comparison is a feature, not an oversight: it is what makes the
+   difference interval [−0.005, +0.009] rather than the sum of two marginal widths
+3. `bincount` over a groupby is roughly twenty times faster, and this runs a thousand times
+4. A 1,000 x 24,467 index matrix is 196 MB for no benefit
+5. B = 1,000 makes the second decimal of a percentage point stable; at B = 200 the third decimal
+   moves while the second does not
+
+**When NOT to Change This:**
+- Never construct a generator at module level
+- Never put an interval on a max-minus-min spread
+- Do not draw independently within a comparison
+
+**When to Revisit:**
+- A statistic skewed enough to need BCa; at n = 24,467 with these near-symmetric statistics the
+  percentile method is adequate and BCa would need its own tests
+
+**Alternatives Considered:**
+- ❌ Analytic standard errors: unavailable for average precision
+- ❌ Hypothesis tests throughout: the workbooks deliberately avoid p-values, and an interval says
+  more; permutation p-values appear only where the question genuinely is "more than chance?"
+
+**Date:** 2026-09-08 | **Status:** ✅ Approved

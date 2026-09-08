@@ -10,13 +10,14 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from startup_outcomes import config
-from startup_outcomes.load import DTYPES, drop_leaky_stage, load_raw
+from startup_outcomes import config, descriptive
+from startup_outcomes.load import DTYPES, drop_leaky_stage
 
 
 @pytest.fixture(scope="module")
-def df() -> pd.DataFrame:
-    return load_raw()
+def df(raw: pd.DataFrame) -> pd.DataFrame:
+    """Delegates to the session fixture so the CSV is read once for the whole suite."""
+    return raw
 
 
 def test_shape(df: pd.DataFrame) -> None:
@@ -92,6 +93,25 @@ def test_city_nests_within_country(df: pd.DataFrame) -> None:
 def test_founding_year_range(df: pd.DataFrame) -> None:
     assert df["Founding_Year"].min() == 2012
     assert df["Founding_Year"].max() == 2025
+
+
+def test_numeric_column_ranges_match_the_documented_table(df: pd.DataFrame) -> None:
+    """Pins every min / median / max quoted in the README's "Dataset at a glance".
+
+    These live here rather than in a tier test file because a column's range is a claim
+    about the *data*, alongside the dtype and cardinality assertions above. The values
+    come from ``descriptive.numeric_ranges`` so the README and the test read one source.
+    """
+    ranges = descriptive.numeric_ranges(df)
+    assert ranges["Total_Funding_USD_Millions"] == {"min": 0.13, "median": 17.54, "max": 12_000.0}
+    assert ranges["Valuation_USD_Millions"] == {"min": 0.5, "median": 146.43, "max": 251_889.95}
+    assert ranges["Revenue_ARR_Millions"] == {"min": 0.0, "median": 4.59, "max": 10_745.25}
+    assert ranges["Monthly_Burn_Rate_Millions"] == {"min": 0.01, "median": 0.85, "max": 927.69}
+    assert ranges["Runway_Months_2024"] == {"min": 2.0, "median": 9.2, "max": 49.2}
+    assert ranges["Founding_Year"] == {"min": 2012.0, "median": 2020.0, "max": 2025.0}
+    assert ranges["Peak_Headcount_2023"] == {"min": 1.0, "median": 51.0, "max": 55_000.0}
+    assert ranges["Layoffs_2024_2025"] == {"min": 0.0, "median": 0.0, "max": 45_106.0}
+    assert ranges["Current_Headcount_2026"] == {"min": 1.0, "median": 51.0, "max": 89_924.0}
 
 
 def test_no_negative_or_impossible_magnitudes(df: pd.DataFrame) -> None:

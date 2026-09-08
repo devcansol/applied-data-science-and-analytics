@@ -10,6 +10,10 @@ uv sync
 uv run jupyter lab
 ```
 
+The analysis runs in four tiers — descriptive, diagnostic, predictive, prescriptive — mirroring the
+course workbooks in `references/`. One module and one notebook each; `report.run_all()` runs them
+all. The headline finding is negative: no model beats ranking by `Runway_Months_2024` alone.
+
 The dataset is not in the repo. See the README for how to obtain `data/raw/global_tech_startups_2026.csv`
 and verify its checksum.
 
@@ -32,7 +36,8 @@ Highlights:
 - Never let an outcome-contemporaneous column reach a model — build feature lists from
   `config.model_features()`, never by hand
 - `data/raw/` is immutable and never committed — nothing writes to it
-- Every number quoted in the README must come from `audit.py` and be pinned by a test
+- Every number quoted in the README must come from a tier module (`audit`, `descriptive`,
+  `diagnostic`, `models/*`) and be pinned in that module's test file
 - Notebooks are exploration only — reusable logic gets promoted into `src/startup_outcomes/`
 - Report model performance against a baseline, never as bare accuracy
 - No adhoc `.md` files or scratch scripts — docs go in `README.md`, decisions in `.claude/rules`
@@ -44,10 +49,10 @@ working in a domain:
 
 | Domain | Rule File |
 |--------|-----------|
-| raw data, loading, dtypes, schema contract, checksums, data layering | `.claude/rules/arch-data-storage.md` |
-| transforms, seeds, vectorization, pipeline stages, reproducibility | `.claude/rules/arch-data-pipeline.md` |
+| raw data, loading, dtypes, schema contract, checksums, data layering, persistence | `.claude/rules/arch-data-storage.md` |
+| transforms, seeds, vectorization, pipeline stages, reproducibility, intervals | `.claude/rules/arch-data-pipeline.md` |
 | features, leakage, baselines, cross-validation, metrics, class imbalance | `.claude/rules/arch-modeling.md` |
-| notebooks, exploration, output hygiene, promotion into src | `.claude/rules/arch-notebooks.md` |
+| notebooks, exploration, output hygiene, promotion into src, plotting | `.claude/rules/arch-notebooks.md` |
 
 ## Post-Task Checklist (MANDATORY)
 
@@ -63,10 +68,10 @@ After any task with code changes:
 
 ```bash
 uv sync                             # create the venv and install from the lockfile
-uv run pytest                       # data contract + audit findings
+uv run pytest                       # every documented finding; ~50s
 uv run ruff check .                 # the quality gate
 uv run ruff format --check .        # formatting gate (uv run ruff format to fix)
 uv run jupyter lab                  # exploration
-uv run python -c "from startup_outcomes.audit import run_all; print(run_all())"
+uv run python -c "from startup_outcomes.report import run_all; print(run_all())"
 shasum -a 256 data/raw/global_tech_startups_2026.csv   # verify the dataset
 ```

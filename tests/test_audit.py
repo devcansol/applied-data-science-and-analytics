@@ -9,12 +9,12 @@ import pandas as pd
 import pytest
 
 from startup_outcomes import audit
-from startup_outcomes.load import load_raw
 
 
 @pytest.fixture(scope="module")
-def df() -> pd.DataFrame:
-    return load_raw()
+def df(raw: pd.DataFrame) -> pd.DataFrame:
+    """Delegates to the session fixture so the CSV is read once for the whole suite."""
+    return raw
 
 
 def test_target_base_rates(df: pd.DataFrame) -> None:
