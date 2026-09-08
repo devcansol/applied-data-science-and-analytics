@@ -27,6 +27,10 @@ packages = ["src/startup_outcomes"]
 [tool.ruff]
 line-length = 100
 src = ["src", "tests"]
+# Ruff formats fenced Python blocks inside Markdown. The harness rule files carry
+# illustrative snippets — including deliberately-wrong "BAD" examples — which must not
+# be rewritten to satisfy the formatter.
+extend-exclude = [".claude"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "PD"]

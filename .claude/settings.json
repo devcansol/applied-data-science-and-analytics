@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv run ruff check .)",
+      "Bash(uv run ruff format --check .)",
+      "Bash(uv run pytest*)",
+      "Bash(uv sync*)",
+      "Bash(uv lock*)",
+      "Bash(ls *)",
+      "Bash(git status)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(shasum -a 256 data/raw/*)"
+    ],
+    "deny": [
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(rm -rf*)",
+      "Bash(rm -fr*)",
+      "Bash(rm data/raw/*)",
+      "Bash(mv data/raw/*)",
+      "Write(./data/raw/**)",
+      "Edit(./data/raw/**)"
+    ]
+  }
+}
