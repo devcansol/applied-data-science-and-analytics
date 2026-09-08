@@ -1,0 +1,16 @@
+# Data — see README "Reproducibility" for how to re-obtain and verify
+data/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
